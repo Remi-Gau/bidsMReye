@@ -328,9 +328,9 @@ def get_root():
         vsr_dir = os.path.normcase(os.path.splitext(versioneer_py)[0])
         if me_dir != vsr_dir:
             print(
-                "Warning: build in %s is using versioneer.py from %s"
-                % (os.path.dirname(my_path), versioneer_py)
+                f"Warning: build in {os.path.dirname(my_path)} is using versioneer.py from {versioneer_py}"
             )
+
     except NameError:
         pass
     return root
@@ -1105,17 +1105,14 @@ def git_get_keywords(versionfile_abs):
         with open(versionfile_abs, "r") as fobj:
             for line in fobj:
                 if line.strip().startswith("git_refnames ="):
-                    mo = re.search(r'=\s*"(.*)"', line)
-                    if mo:
-                        keywords["refnames"] = mo.group(1)
+                    if mo := re.search(r'=\s*"(.*)"', line):
+                        keywords["refnames"] = mo[1]
                 if line.strip().startswith("git_full ="):
-                    mo = re.search(r'=\s*"(.*)"', line)
-                    if mo:
-                        keywords["full"] = mo.group(1)
+                    if mo := re.search(r'=\s*"(.*)"', line):
+                        keywords["full"] = mo[1]
                 if line.strip().startswith("git_date ="):
-                    mo = re.search(r'=\s*"(.*)"', line)
-                    if mo:
-                        keywords["date"] = mo.group(1)
+                    if mo := re.search(r'=\s*"(.*)"', line):
+                        keywords["date"] = mo[1]
     except OSError:
         pass
     return keywords
@@ -1200,10 +1197,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
     expanded, and _version.py hasn't already been rewritten with a short
     version string, meaning we're inside a checked out source tree.
     """
-    GITS = ["git"]
-    if sys.platform == "win32":
-        GITS = ["git.cmd", "git.exe"]
-
+    GITS = ["git.cmd", "git.exe"] if sys.platform == "win32" else ["git"]
     # GIT_DIR can interfere with correct operation of Versioneer.
     # It may be intended to be passed to the Versioneer-versioned project,
     # but that should not change where we get our version from.
@@ -1235,11 +1229,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
         raise NotThisMethod("'git rev-parse' failed")
     full_out = full_out.strip()
 
-    pieces = {}
-    pieces["long"] = full_out
-    pieces["short"] = full_out[:7]  # maybe improved later
-    pieces["error"] = None
-
+    pieces = {"long": full_out, "short": full_out[:7], "error": None}
     branch_name, rc = runner(GITS, ["rev-parse", "--abbrev-ref", "HEAD"], cwd=root)
     # --abbrev-ref was added in git-1.6.3
     if rc != 0 or branch_name is None:
@@ -1293,7 +1283,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
             return pieces
 
         # tag
-        full_tag = mo.group(1)
+        full_tag = mo[1]
         if not full_tag.startswith(tag_prefix):
             if verbose:
                 fmt = "tag '%s' doesn't start with prefix '%s'"
@@ -1306,10 +1296,10 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
         pieces["closest-tag"] = full_tag[len(tag_prefix) :]
 
         # distance: number of commits since tag
-        pieces["distance"] = int(mo.group(2))
+        pieces["distance"] = int(mo[2])
 
         # commit: short hex revision ID
-        pieces["short"] = mo.group(3)
+        pieces["short"] = mo[3]
 
     else:
         # HEX: no tags
@@ -1333,16 +1323,14 @@ def do_vcs_install(manifest_in, versionfile_source, ipy):
     For Git, this means creating/changing .gitattributes to mark _version.py
     for export-subst keyword substitution.
     """
-    GITS = ["git"]
-    if sys.platform == "win32":
-        GITS = ["git.cmd", "git.exe"]
+    GITS = ["git.cmd", "git.exe"] if sys.platform == "win32" else ["git"]
     files = [manifest_in, versionfile_source]
     if ipy:
         files.append(ipy)
     try:
         my_path = __file__
         if my_path.endswith(".pyc") or my_path.endswith(".pyo"):
-            my_path = os.path.splitext(my_path)[0] + ".py"
+            my_path = f"{os.path.splitext(my_path)[0]}.py"
         versioneer_file = os.path.relpath(my_path)
     except NameError:
         versioneer_file = "versioneer.py"
@@ -1351,10 +1339,12 @@ def do_vcs_install(manifest_in, versionfile_source, ipy):
     try:
         with open(".gitattributes", "r") as fobj:
             for line in fobj:
-                if line.strip().startswith(versionfile_source):
-                    if "export-subst" in line.strip().split()[1:]:
-                        present = True
-                        break
+                if (
+                    line.strip().startswith(versionfile_source)
+                    and "export-subst" in line.strip().split()[1:]
+                ):
+                    present = True
+                    break
     except OSError:
         pass
     if not present:
@@ -1388,9 +1378,9 @@ def versions_from_parentdir(parentdir_prefix, root, verbose):
 
     if verbose:
         print(
-            "Tried directories %s but none started with prefix %s"
-            % (str(rootdirs), parentdir_prefix)
+            f"Tried directories {rootdirs} but none started with prefix {parentdir_prefix}"
         )
+
     raise NotThisMethod("rootdir doesn't start with parentdir_prefix")
 
 
@@ -1428,7 +1418,7 @@ def versions_from_file(filename):
         )
     if not mo:
         raise NotThisMethod("no version_json in _version.py")
-    return json.loads(mo.group(1))
+    return json.loads(mo[1])
 
 
 def write_to_version_file(filename, versions):
@@ -1443,9 +1433,7 @@ def write_to_version_file(filename, versions):
 
 def plus_or_dot(pieces):
     """Return a + if we don't already have one, else return a ."""
-    if "+" in pieces.get("closest-tag", ""):
-        return "."
-    return "+"
+    return "." if "+" in pieces.get("closest-tag", "") else "+"
 
 
 def render_pep440(pieces):
@@ -1462,13 +1450,11 @@ def render_pep440(pieces):
         if pieces["distance"] or pieces["dirty"]:
             rendered += plus_or_dot(pieces)
             rendered += "%d.g%s" % (pieces["distance"], pieces["short"])
-            if pieces["dirty"]:
-                rendered += ".dirty"
     else:
         # exception #1
         rendered = "0+untagged.%d.g%s" % (pieces["distance"], pieces["short"])
-        if pieces["dirty"]:
-            rendered += ".dirty"
+    if pieces["dirty"]:
+        rendered += ".dirty"
     return rendered
 
 
@@ -1488,16 +1474,14 @@ def render_pep440_branch(pieces):
                 rendered += ".dev0"
             rendered += plus_or_dot(pieces)
             rendered += "%d.g%s" % (pieces["distance"], pieces["short"])
-            if pieces["dirty"]:
-                rendered += ".dirty"
     else:
         # exception #1
         rendered = "0"
         if pieces["branch"] != "master":
             rendered += ".dev0"
         rendered += "+untagged.%d.g%s" % (pieces["distance"], pieces["short"])
-        if pieces["dirty"]:
-            rendered += ".dirty"
+    if pieces["dirty"]:
+        rendered += ".dirty"
     return rendered
 
 
@@ -1578,16 +1562,14 @@ def render_pep440_post_branch(pieces):
                 rendered += ".dev0"
             rendered += plus_or_dot(pieces)
             rendered += f"g{pieces['short']}"
-            if pieces["dirty"]:
-                rendered += ".dirty"
     else:
         # exception #1
         rendered = "0.post%d" % pieces["distance"]
         if pieces["branch"] != "master":
             rendered += ".dev0"
         rendered += f"+g{pieces['short']}"
-        if pieces["dirty"]:
-            rendered += ".dirty"
+    if pieces["dirty"]:
+        rendered += ".dirty"
     return rendered
 
 
@@ -1603,13 +1585,11 @@ def render_pep440_old(pieces):
         rendered = pieces["closest-tag"]
         if pieces["distance"] or pieces["dirty"]:
             rendered += ".post%d" % pieces["distance"]
-            if pieces["dirty"]:
-                rendered += ".dev0"
     else:
         # exception #1
         rendered = "0.post%d" % pieces["distance"]
-        if pieces["dirty"]:
-            rendered += ".dev0"
+    if pieces["dirty"]:
+        rendered += ".dev0"
     return rendered
 
 
@@ -1746,8 +1726,7 @@ def get_versions(verbose=False):
     except NotThisMethod:
         pass
 
-    from_vcs_f = handlers.get("pieces_from_vcs")
-    if from_vcs_f:
+    if from_vcs_f := handlers.get("pieces_from_vcs"):
         try:
             pieces = from_vcs_f(cfg.tag_prefix, root, verbose)
             ver = render(pieces, cfg.style)
@@ -2143,7 +2122,7 @@ def scan_setup_py():
     setters = False
     errors = 0
     with open("setup.py", "r") as f:
-        for line in f.readlines():
+        for line in f:
             if "import versioneer" in line:
                 found.add("import")
             if "versioneer.get_cmdclass()" in line:
